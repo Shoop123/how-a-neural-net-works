@@ -1,0 +1,43 @@
+#forward-pass-details-row {
+	display: none;
+}
+
+#backward-pass-details-row {
+	display: none;
+}
+
+#weight-update-details-row {
+	display: none;
+}
+
+.tooltip {
+	position: relative;
+	display: inline-block;
+	border-bottom: 1px dotted black;
+}
+
+.tooltip .tooltip-text {
+	visibility: hidden;
+	width: 200px;
+	background-color: black;
+	color: #fff;
+	text-align: center;
+	border-radius: 6px;
+	padding: 5px 0;
+	position: absolute;
+	z-index: 1;
+}
+
+.tooltip:hover .tooltip-text {
+	visibility: visible;
+}
+
+.tooltip:active .tooltip-text {
+	visibility: visible;
+}
+
+@media only screen and (max-width: 665px) {
+	nav .brand-logo {
+		font-size: 1.1rem; 
+	}
+}

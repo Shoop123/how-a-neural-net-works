@@ -1,0 +1,10 @@
+website-infra/*.js
+website-infra/!jest.config.js
+website-infra/*.d.ts
+node_modules
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+
+.vscode

@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+	<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+	<link type="text/css" rel="stylesheet" href="css/dependencies/materialize.min.css" media="screen,projection" />
+	<link rel="stylesheet" type="text/css" href="css/home.css">
+
+	<script type="text/javascript" src="js/dependencies/jquery-3.5.1.min.js"></script>
+	<script type="text/javascript" src="js/dependencies/materialize.min.js"></script>
+	<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+	<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3.0.1/es5/tex-mml-chtml.js"></script>
+
+	<!-- <script>var clicky_site_ids = clicky_site_ids || []; clicky_site_ids.push(101269735);</script>
+		<script async src="//static.getclicky.com/js"></script> -->
+
+	<title>How a Neural Net Works</title>
+
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+	<meta name="description"
+		content="Create a simple numerical demo of the backpropagation algorithm with your own custom neural network.">
+</head>
+
+<body>
+	<header>
+		<div class="row">
+			<nav class="nav-extended teal">
+				<div class="nav-wrapper">
+					<div class="col s12">
+						<a href="#" class="brand-logo">How a Neural Net Works</a>
+					</div>
+				</div>
+				<div class="nav-content">
+					<ul class="tabs tabs-transparent">
+						<li class="tab"><a class="active" href="#demo">Demo</a></li>
+						<li class="tab"><a href="#about">About</a></li>
+					</ul>
+				</div>
+			</nav>
+		</div>
+	</header>
+
+	<main>
+
+		<div class="container">
+			<div id="demo">
+				<div class="row">
+					<canvas id="neural-net-canvas">
+						This webpage uses the canvas HTML element, which may not be supported by older browsers. Please
+						try a newer browser to fix this issue.
+					</canvas>
+				</div>
+
+				<ul class="collapsible expandable">
+					<li class="active">
+						<div class="collapsible-header">Notes/Tips</div>
+						<div class="collapsible-body">
+							<div id="notes-tips-contents-row" class="row">
+								<div class="col l4 s12">
+									<p>How to use:</p>
+									<ol>
+										<li>Enter your input, weights, and target output in the text fields, or leave as
+											default
+											<ul class="browser-default">
+												<li>Hit the "Update Parameters" button if you made any changes</li>
+											</ul>
+										</li>
+										<li>Press the "Forward Pass" button - this will run your input value through the
+											network to produce an output</li>
+										<li>Press the "Backpropagate" button - this will run a vanilla gradient descent
+											calculation to determine weight updates</li>
+										<li>Press the "Update Weights" button - this will update the weights using the
+											learning rate in the network</li>
+										<li>Repeat - and see how the netword output slowly comes to closer to the target
+											you set</li>
+									</ol>
+
+									<hr class="hide-on-large-only">
+								</div>
+
+								<div class="col l4 s12">
+									<p>General notes:</p>
+									<ul class="browser-default">
+										<li>This website works best on desktop</li>
+										<li>All numbers are rounded to 4 digits after each operation</li>
+										<li>This is a simple neural network, flowing from left (input node) to right
+											(output node)</li>
+										<li>The "hidden" nodes are the two in the middle, there is a top one, and a
+											bottom one</li>
+										<li>The "Forward Pass", "Backpropagate", and "Update Weights" buttons will
+											appear as you go through the process</li>
+										<li>More details about each operation will also appear as you go through the
+											process</li>
+									</ul>
+
+									<hr class="hide-on-large-only">
+								</div>
+
+								<div class="col l4 s12">
+									<p>Tips:</p>
+									<div>
+										<div class="tooltip">
+											Hover
+											<span class="tooltip-text">To see more info about the calculations</span>
+										</div>
+										<span>over underlined text</span>
+									</div>
+								</div>
+							</div>
+						</div>
+					</li>
+					<li id="forward-pass-details" class="hide">
+						<div class="collapsible-header">Forward Pass Results</div>
+						<div class="collapsible-body">
+							<div class="row">
+								<div class="col l3 s12">
+									<p id="input-value-details">Input value: 0.5</p>
+
+									<div>
+										<div class="tooltip">
+											Input to Top Hidden Node:
+											<span class="tooltip-text">Input value multiplied by Weight 1</span>
+										</div>
+										<span id="input-to-top-hidden-node-details">0.5</span>
+									</div>
+
+									<div>
+										<div class="tooltip">
+											Input to Bottom Hidden Node:
+											<span class="tooltip-text">Input value multiplied by Weight 2</span>
+										</div>
+										<span id="input-to-bottom-hidden-node-details">0.5</span>
+									</div>
+
+									<hr class="hide-on-large-only">
+								</div>
+								<div class="col l6 s12">
+									<div>
+										<div class="tooltip">
+											Output of Top Hidden Node:
+											<span class="tooltip-text">Sigmoid function of the input to top hidden
+												node</span>
+										</div>
+										<span id="output-of-top-hidden-node-details">0.5</span>
+									</div>
+
+									<div>
+										<div class="tooltip">
+											Output of Bottom Hidden Node:
+											<span class="tooltip-text">Sigmoid function of the input to bottom hidden
+												node</span>
+										</div>
+										<span id="output-of-bottom-hidden-node-details">0.5</span>
+									</div>
+
+									<hr>
+
+									<div>
+										<div class="tooltip">
+											Input to Output Node from Top Hidden Neuron:
+											<span class="tooltip-text">Output of top hidden node multiplied by Weight
+												3</span>
+										</div>
+										<span id="input-to-output-node-from-hidden-top-node-details">0.5</span>
+									</div>
+
+									<div>
+										<div class="tooltip">
+											Input to Output Node from Bottom Hidden Neuron:
+											<span class="tooltip-text">Output of bottom hidden node multiplied by Weight
+												4</span>
+										</div>
+										<span id="input-to-output-node-from-hidden-bottom-node-details">0.5</span>
+									</div>
+
+									<hr>
+
+									<div>
+										<div class="tooltip">
+											Final Input to Output Node:
+											<span class="tooltip-text">Sum of the weight-adjusted outputs of the hidden
+												nodes</span>
+										</div>
+										<span id="final-input-to-output-node-details">0.5</span>
+									</div>
+
+									<hr class="hide-on-large-only">
+								</div>
+								<div class="col l3 s12">
+									<div>
+										<div class="tooltip">
+											Output of Output Node:
+											<span class="tooltip-text">In this case, the output node does not have an
+												activation function</span>
+										</div>
+										<span id="output-of-output-node-details">0.5</span>
+									</div>
+								</div>
+							</div>
+						</div>
+					</li>
+					<li id="backward-pass-details" class="hide">
+						<div class="collapsible-header">Backpropagation Results</div>
+						<div class="collapsible-body">
+							<div class="row">
+								<div class="col l3 s12">
+									<div>
+										<div class="tooltip">
+											\(\frac{\partial MSE}{\partial W1}\):
+											<span class="tooltip-text">Derivative of the MSE w.r.t Weight 1</span>
+										</div>
+										<span id="dMSEdW1">0.5</span>
+									</div>
+
+									<div>
+										<div class="tooltip">
+											\(\frac{\partial MSE}{\partial W2}\):
+											<span class="tooltip-text">Derivative of the MSE w.r.t Weight 2</span>
+										</div>
+										<span id="dMSEdW2">0.5</span>
+									</div>
+
+									<hr class="hide-on-large-only">
+								</div>
+								<div class="col l6 s12">
+									<div>
+										<div class="tooltip">
+											\(\frac{\partial MSE}{\partial W3}\):
+											<span class="tooltip-text">Derivative of the MSE w.r.t Weight 3</span>
+										</div>
+										<span id="dMSEdW3">0.5</span>
+									</div>
+
+									<div>
+										<div class="tooltip">
+											\(\frac{\partial MSE}{\partial W4}\):
+											<span class="tooltip-text">Derivative of the MSE w.r.t Weight 4</span>
+										</div>
+										<span id="dMSEdW4">0.5</span>
+									</div>
+
+									<hr>
+
+									<div>
+										<div class="tooltip">
+											\(\frac{\partial MSE}{\partial HNTO}\):
+											<span class="tooltip-text">Derivative of the MSE w.r.t Hidden Node Top
+												Output</span>
+										</div>
+										<span id="dMSEdHNTO">0.5</span>
+									</div>
+
+									<div>
+										<div class="tooltip">
+											\(\frac{\partial MSE}{\partial HNBO}\):
+											<span class="tooltip-text">Derivative of the MSE w.r.t Hidden Node Bottom
+												Output</span>
+										</div>
+										<span id="dMSEdHNBO">0.5</span>
+									</div>
+
+									<hr>
+
+									<div>
+										<div class="tooltip">
+											\(\frac{\partial MSE}{\partial HNTI}\):
+											<span class="tooltip-text">Derivative of the MSE w.r.t Hidden Node Top
+												Input</span>
+										</div>
+										<span id="dMSEdHNTI">0.5</span>
+									</div>
+
+									<div>
+										<div class="tooltip">
+											\(\frac{\partial MSE}{\partial HNBI}\):
+											<span class="tooltip-text">Derivative of the MSE w.r.t Hidden Node Bottom
+												Input</span>
+										</div>
+										<span id="dMSEdHNBI">0.5</span>
+									</div>
+
+									<hr class="hide-on-large-only">
+								</div>
+								<div class="col l3 s12">
+									<div>
+										<div class="tooltip">
+											Error:
+											<span class="tooltip-text">Error, calculated by target - actual</span>
+										</div>
+										<span id="error">0.5</span>
+									</div>
+
+									<div>
+										<div class="tooltip">
+											MSE:
+											<span class="tooltip-text">Mean Squared Error, calculated by (target -
+												actual)^2</span>
+										</div>
+										<span id="mse">0.5</span>
+									</div>
+
+									<div>
+										<div class="tooltip">
+											\(\frac{\partial MSE}{\partial Out}\):
+											<span class="tooltip-text">Derivative of the MSE w.r.t Output</span>
+										</div>
+										<span id="dMSEdO">0.5</span>
+									</div>
+								</div>
+							</div>
+						</div>
+					</li>
+					<li id="weight-update-details" class="hide">
+						<div class="collapsible-header">Weight Update Results</div>
+						<div class="collapsible-body">
+							<div class="row">
+								<div class="col l4 offset-l2 s12 center-align">
+									<div>
+										<div class="tooltip">
+											Weight 1:
+											<span class="tooltip-text">Weight 1 update, calulated with w1 = w1 -
+												⍺*dMSEdW1</span>
+										</div>
+										<span id="w1-update">0.5</span>
+									</div>
+
+									<div>
+										<div class="tooltip">
+											Weight 2:
+											<span class="tooltip-text">Weight 2 update, calulated with w2 = w2 -
+												⍺*dMSEdW2</span>
+										</div>
+										<span id="w2-update">0.5</span>
+									</div>
+
+									<hr class="hide-on-large-only">
+								</div>
+								<div class="col l4 s12 center-align">
+									<div>
+										<div class="tooltip">
+											Weight 3:
+											<span class="tooltip-text">Weight 3 update, calulated with w3 = w3 -
+												⍺*dMSEdW3</span>
+										</div>
+										<span id="w3-update">0.5</span>
+									</div>
+
+									<div>
+										<div class="tooltip">
+											Weight 4:
+											<span class="tooltip-text">Weight 4 update, calulated with w4 = w4 -
+												⍺*dMSEdW4</span>
+										</div>
+										<span id="w4-update">0.5</span>
+									</div>
+								</div>
+							</div>
+						</div>
+					</li>
+				</ul>
+
+				<div class="row">
+					<div class="col s12 valign-wrapper">
+						<div class="row">
+							<div class="input-field col l3 s12">
+								<input id="input-value" type="number" min="-99999" max="99999">
+								<label for="input">Input Value</label>
+							</div>
+
+							<div class="col l6 s12">
+								<div class="row">
+									<div class="input-field col s6">
+										<input id="w1" type="number" min="-99999" max="99999">
+										<label for="w1">Weight 1 Value</label>
+									</div>
+
+									<div class="input-field col s6">
+										<input id="w3" type="number" min="-99999" max="99999">
+										<label for="w3">Weight 3 Value</label>
+									</div>
+								</div>
+
+								<div class="row">
+									<div class="input-field col s6">
+										<input id="w2" type="number" min="-99999" max="99999">
+										<label for="w2">Weight 2 Value</label>
+									</div>
+
+									<div class="input-field col s6">
+										<input id="w4" type="number" min="-99999" max="99999">
+										<label for="w4">Weight 4 Value</label>
+									</div>
+								</div>
+							</div>
+
+							<div class="input-field col l3 s12">
+								<input id="target-output" type="number" min="-99999" max="99999">
+								<label for="target-output">Target Output</label>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<div class="row">
+					<div class="input-field col l3 s12">
+						<input id="learning-rate" type="number" min="-99999" max="99999">
+						<label for="learning-rate">Learning Rate</label>
+					</div>
+				</div>
+
+				<div class="row center-align">
+					<div class="col s12">
+						<a id="forward-pass-button" class="waves-effect waves-light btn">Forward Pass</a>
+						<a id="backward-pass-button" class="waves-effect waves-light btn disabled">Backpropagate</a>
+						<a id="update-weights-button" class="waves-effect waves-light btn disabled">Update Weights</a>
+						<a id="update-parameters-button" class="waves-effect waves-light btn">Update Parameters</a>
+						<a id="randomize-weights-button" class="waves-effect waves-light btn">Randomize Weights</a>
+					</div>
+				</div>
+			</div>
+
+			<div id="about">
+				<p>
+					This website was inspired by Matt Mazur, specifically 
+					<a href="https://mattmazur.com/2015/03/17/a-step-by-step-backpropagation-example/" target="_blank">
+						his post about a step-by-step back-propagation example on his website
+					</a> which helped me out a ton when I was learning about neural nets the first time.
+				</p>
+
+				<p>
+					When I was learning the ins and outs of how neural nets worked, and their training process,
+					it was extremely hard to find a decent beginner friendly article or video with a numerical
+					demonstration of the backpropagation algorithm. As such, when working out examples with pen and
+					paper it was
+					difficult to know if I got the correct answer, and if my method would work in reality. I thought now
+					that
+					I have some time and I'm passed that point of struggle, I could create a simple website which will
+					help others
+					who might find themselves in a similar position to past me.
+				</p>
+
+				<p>
+					For those who want an easy quick-start in building neural nets, you can check out my easy-to-use <a
+						href="https://github.com/Shoop123/berenet">neural net library</a>
+					on my GitHub.
+					I recommend this library to beginners who are trying to experiment and grasp the different concepts
+					of neural networks
+					rather then professionals trying to build production grade models, as better libraries are available
+					for that.
+				</p>
+			</div>
+		</div>
+	</main>
+
+	<script type="text/javascript" src="js/home.js"></script>
+</body>
+
+</html>
