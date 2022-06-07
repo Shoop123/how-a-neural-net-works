@@ -1,11 +1,11 @@
 import { Construct } from 'constructs';
 import { RemovalPolicy, Stack, StackProps, aws_s3 as s3 } from 'aws-cdk-lib';
 import { BucketDeployment, Source } from 'aws-cdk-lib/aws-s3-deployment'
-import { CloudFrontTarget, Route53RecordTarget } from 'aws-cdk-lib/aws-route53-targets'
-import * as route53 from 'aws-cdk-lib/aws-route53'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
-import * as origins from 'aws-cdk-lib/aws-cloudfront-origins'
-import * as certificates from 'aws-cdk-lib/aws-certificatemanager'
+import { BlockPublicAccess, Bucket, BucketAccessControl, BucketEncryption } from 'aws-cdk-lib/aws-s3';
+import { HttpVersion, OriginAccessIdentity, PriceClass, ViewerCertificate, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
+import { HostedZone, IHostedZone } from 'aws-cdk-lib/aws-route53';
+import { Certificate, DnsValidatedCertificate } from 'aws-cdk-lib/aws-certificatemanager';
 
 const DOMAIN_PREFIX: string = 'www'
 const APEX_DOMAIN_NAME: string = 'howaneuralnetworks.com'
@@ -17,27 +17,29 @@ export class WebsiteInfraStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    const originAccessIdentity = new cloudfront.OriginAccessIdentity(this, "OAI")
+    const oai = new OriginAccessIdentity(this, "OAI")
 
-    const websiteBucket = this.createBuckets(originAccessIdentity)
+    const websiteBucket = this.createBucket(oai)
 
-    const zone = this.createHostedZone()
+    const zone = this.getHostedZone()
 
-    const cloudfrontDistribution = this.createCloudfrontDistribution(zone, websiteBucket, originAccessIdentity)
+    const certificate = this.createCertificate(zone)
 
-    this.createARecords(zone, cloudfrontDistribution)
+    this.createWebDistribution(websiteBucket, oai, certificate)
   }
 
-  private createBuckets(originAccessIdentity: cloudfront.OriginAccessIdentity): s3.Bucket {
-    const websiteBucket = new s3.Bucket(this, 'WebsiteBucket', {
-      websiteIndexDocument: INDEX,
-      bucketName: DOMAIN_NAME,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+  private createBucket(oai: cloudfront.OriginAccessIdentity): Bucket {
+    const websiteBucket = new Bucket(this, 'WebsiteBucket', {
+      encryption: BucketEncryption.S3_MANAGED,
+      bucketName: APEX_DOMAIN_NAME,
+      publicReadAccess: false,
       removalPolicy: RemovalPolicy.DESTROY,
-      autoDeleteObjects: true
+      autoDeleteObjects: true,
+      accessControl: BucketAccessControl.PRIVATE,
+      blockPublicAccess: BlockPublicAccess.BLOCK_ALL
     })
 
-    websiteBucket.grantRead(originAccessIdentity)
+    websiteBucket.grantRead(oai)
 
     new BucketDeployment(this, 'DeployStaticWebsite', {
       sources: [Source.asset('../website')],
@@ -47,54 +49,61 @@ export class WebsiteInfraStack extends Stack {
     return websiteBucket
   }
 
-  private createHostedZone(): route53.IHostedZone {
-    const zone = route53.HostedZone.fromHostedZoneAttributes(this, 'DomainHostedZone', {
+  private getHostedZone(): IHostedZone {
+    return HostedZone.fromHostedZoneAttributes(this, 'ApexDomainHostedZone', {
       hostedZoneId: 'Z01969333OW6OGWVC243G',
       zoneName: APEX_DOMAIN_NAME
     })
-
-    return zone
   }
 
-  private createCloudfrontDistribution(zone: route53.IHostedZone, websiteBucket: s3.Bucket, originAccessIdentity: cloudfront.OriginAccessIdentity): cloudfront.Distribution {
-    const certificate = new certificates.DnsValidatedCertificate(this, 'WebsiteCertificate', {
-      domainName: DOMAIN_NAME,
-      subjectAlternativeNames: [APEX_DOMAIN_NAME],
+  private createCertificate(zone: IHostedZone): Certificate {
+    return new DnsValidatedCertificate(this, 'WebsiteCertificate', {
+      domainName: APEX_DOMAIN_NAME,
+      subjectAlternativeNames: [DOMAIN_NAME],
       hostedZone: zone,
       region: CERTIFICATE_REGION,
       cleanupRoute53Records: true,
     })
-
-    function generateDistributionProps(bucket: s3.Bucket, domainName: string) {
-      return {
-        defaultBehavior: {
-          origin: new origins.S3Origin(bucket, {
-            originAccessIdentity: originAccessIdentity
-          }),
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS
-        },
-        priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
-        sslSupportMethod: cloudfront.SSLMethod.SNI,
-        domainNames: [
-          domainName
-        ],
-        certificate: certificate,
-        defaultRootObject: INDEX,
-        enableLogging: true
-      }
-    }
-
-    const distributionDomainName = new cloudfront.Distribution(this, 'WebsiteDistribution', generateDistributionProps(websiteBucket, DOMAIN_NAME));
-
-    return distributionDomainName
   }
 
-  private createARecords(zone: route53.IHostedZone, distributionDomainName: cloudfront.Distribution){
-    new route53.ARecord(this, 'AliasRecord', {
-      zone,
-      recordName: DOMAIN_PREFIX,
-      target: route53.RecordTarget.fromAlias(new CloudFrontTarget(distributionDomainName))
+  private createWebDistribution(websiteBucket: Bucket, oai: OriginAccessIdentity, certificate: Certificate) {
+    new cloudfront.CloudFrontWebDistribution(this, 'WebsiteDistribution', {
+      viewerCertificate: ViewerCertificate.fromAcmCertificate(certificate, {
+        aliases: [DOMAIN_NAME, APEX_DOMAIN_NAME],
+      }),
+      defaultRootObject: INDEX,
+      viewerProtocolPolicy: ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      httpVersion: HttpVersion.HTTP2,
+      priceClass: PriceClass.PRICE_CLASS_100,
+      originConfigs: [
+        {
+          s3OriginSource: {
+            originAccessIdentity: oai,
+            s3BucketSource: websiteBucket
+          },
+          behaviors: [
+            {
+              compress: true,
+              isDefaultBehavior: true,
+            },
+          ],
+        },
+      ],
+      // Allows React to handle all errors internally
+      // errorConfigurations: [
+      //   {
+      //     errorCachingMinTtl: 300, // in seconds
+      //     errorCode: 403,
+      //     responseCode: 200,
+      //     responsePagePath: `/${ROOT_INDEX_FILE}`,
+      //   },
+      //   {
+      //     errorCachingMinTtl: 300, // in seconds
+      //     errorCode: 404,
+      //     responseCode: 200,
+      //     responsePagePath: `/${ROOT_INDEX_FILE}`,
+      //   },
+      // ]
     })
   }
 }
