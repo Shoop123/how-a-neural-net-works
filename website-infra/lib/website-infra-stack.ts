@@ -31,7 +31,7 @@ export class WebsiteInfraStack extends Stack {
   private createBucket(oai: cloudfront.OriginAccessIdentity): Bucket {
     const websiteBucket = new Bucket(this, 'WebsiteBucket', {
       encryption: BucketEncryption.S3_MANAGED,
-      bucketName: APEX_DOMAIN_NAME,
+      bucketName: DOMAIN_NAME,
       publicReadAccess: false,
       removalPolicy: RemovalPolicy.DESTROY,
       autoDeleteObjects: true,
