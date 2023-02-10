@@ -3,9 +3,15 @@ import { RemovalPolicy, Stack, StackProps, aws_s3 as s3 } from 'aws-cdk-lib';
 import { BucketDeployment, Source } from 'aws-cdk-lib/aws-s3-deployment'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import { BlockPublicAccess, Bucket, BucketAccessControl, BucketEncryption } from 'aws-cdk-lib/aws-s3';
-import { HttpVersion, OriginAccessIdentity, PriceClass, ViewerCertificate, ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
-import { HostedZone, IHostedZone } from 'aws-cdk-lib/aws-route53';
-import { Certificate, DnsValidatedCertificate } from 'aws-cdk-lib/aws-certificatemanager';
+import {
+  HttpVersion,
+  OriginAccessIdentity,
+  PriceClass,
+  ViewerCertificate,
+  ViewerProtocolPolicy } from 'aws-cdk-lib/aws-cloudfront';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as certificateManager from 'aws-cdk-lib/aws-certificatemanager';
+import * as targets from 'aws-cdk-lib/aws-route53-targets'
 
 const DOMAIN_PREFIX: string = 'www'
 const APEX_DOMAIN_NAME: string = 'howaneuralnetworks.com'
@@ -17,7 +23,7 @@ export class WebsiteInfraStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    const oai = new OriginAccessIdentity(this, "OAI")
+    const oai = new OriginAccessIdentity(this, "HannwBucketOai")
 
     const websiteBucket = this.createBucket(oai)
 
@@ -25,11 +31,13 @@ export class WebsiteInfraStack extends Stack {
 
     const certificate = this.createCertificate(zone)
 
-    this.createWebDistribution(websiteBucket, oai, certificate)
+    const webDistribution = this.createWebDistribution(websiteBucket, oai, certificate)
+
+    this.addAliasForDistribution(zone, webDistribution)
   }
 
   private createBucket(oai: cloudfront.OriginAccessIdentity): Bucket {
-    const websiteBucket = new Bucket(this, 'WebsiteBucket', {
+    const websiteBucket = new Bucket(this, 'HannwResourceBucket', {
       encryption: BucketEncryption.S3_MANAGED,
       bucketName: DOMAIN_NAME,
       publicReadAccess: false,
@@ -41,7 +49,7 @@ export class WebsiteInfraStack extends Stack {
 
     websiteBucket.grantRead(oai)
 
-    new BucketDeployment(this, 'DeployStaticWebsite', {
+    new BucketDeployment(this, 'HannwDeployStatic', {
       sources: [Source.asset('../website')],
       destinationBucket: websiteBucket
    })
@@ -49,15 +57,30 @@ export class WebsiteInfraStack extends Stack {
     return websiteBucket
   }
 
-  private getHostedZone(): IHostedZone {
-    return HostedZone.fromHostedZoneAttributes(this, 'ApexDomainHostedZone', {
+  private addAliasForDistribution(zone: route53.IHostedZone,
+    webDistribution: cloudfront.CloudFrontWebDistribution) {
+    new route53.ARecord(this, 'HannwARecordForApexAvailability', {
+      zone: zone,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(webDistribution)),
+      recordName: APEX_DOMAIN_NAME
+    })
+
+    new route53.ARecord(this, 'HannwARecordForWwwAvailability', {
+      zone: zone,
+      target: route53.RecordTarget.fromAlias(new targets.CloudFrontTarget(webDistribution)),
+      recordName: DOMAIN_NAME
+    })
+  }
+
+  private getHostedZone(): route53.IHostedZone {
+    return route53.HostedZone.fromHostedZoneAttributes(this, 'HannwHostedZone', {
       hostedZoneId: 'Z01969333OW6OGWVC243G',
       zoneName: APEX_DOMAIN_NAME
     })
   }
 
-  private createCertificate(zone: IHostedZone): Certificate {
-    return new DnsValidatedCertificate(this, 'WebsiteCertificate', {
+  private createCertificate(zone: route53.IHostedZone): certificateManager.Certificate {
+    return new certificateManager.DnsValidatedCertificate(this, 'HannwCertificate', {
       domainName: APEX_DOMAIN_NAME,
       subjectAlternativeNames: [DOMAIN_NAME],
       hostedZone: zone,
@@ -66,8 +89,11 @@ export class WebsiteInfraStack extends Stack {
     })
   }
 
-  private createWebDistribution(websiteBucket: Bucket, oai: OriginAccessIdentity, certificate: Certificate) {
-    new cloudfront.CloudFrontWebDistribution(this, 'WebsiteDistribution', {
+  private createWebDistribution(websiteBucket: Bucket,
+    oai: OriginAccessIdentity,
+    certificate: certificateManager.Certificate
+    ): cloudfront.CloudFrontWebDistribution {
+    return new cloudfront.CloudFrontWebDistribution(this, 'HannwWebsiteDistribution', {
       viewerCertificate: ViewerCertificate.fromAcmCertificate(certificate, {
         aliases: [DOMAIN_NAME, APEX_DOMAIN_NAME],
       }),
@@ -85,25 +111,10 @@ export class WebsiteInfraStack extends Stack {
             {
               compress: true,
               isDefaultBehavior: true,
-            },
-          ],
-        },
-      ],
-      // Allows React to handle all errors internally
-      // errorConfigurations: [
-      //   {
-      //     errorCachingMinTtl: 300, // in seconds
-      //     errorCode: 403,
-      //     responseCode: 200,
-      //     responsePagePath: `/${ROOT_INDEX_FILE}`,
-      //   },
-      //   {
-      //     errorCachingMinTtl: 300, // in seconds
-      //     errorCode: 404,
-      //     responseCode: 200,
-      //     responsePagePath: `/${ROOT_INDEX_FILE}`,
-      //   },
-      // ]
+            }
+          ]
+        }
+      ]
     })
   }
 }
